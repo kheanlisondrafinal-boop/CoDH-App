@@ -1,0 +1,115 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information and role.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["employee", "admin", "chief", "sysadmin"] },
+        "department": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "role"]
+    },
+    "DTRCorrection": {
+      "title": "DTR Correction Request",
+      "description": "Request to correct a missed or incorrect log-in/out.",
+      "type": "object",
+      "properties": {
+        "requesterId": { "type": "string" },
+        "requesterEmail": { "type": "string" },
+        "requesterName": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "correctionType": { "type": "string", "enum": ["in", "out", "both"] },
+        "requestedTime": { "type": "string" },
+        "reason": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "admin_approved", "approved", "rejected"] },
+        "adminId": { "type": "string" },
+        "chiefId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["requesterId", "date", "requestedTime", "reason", "status"]
+    },
+    "LeaveApplication": {
+      "title": "Leave Application",
+      "description": "Request for leave of absence.",
+      "type": "object",
+      "properties": {
+        "requesterId": { "type": "string" },
+        "requesterEmail": { "type": "string" },
+        "requesterName": { "type": "string" },
+        "startDate": { "type": "string", "format": "date-time" },
+        "endDate": { "type": "string", "format": "date-time" },
+        "leaveType": { "type": "string" },
+        "reason": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "admin_approved", "approved", "rejected"] },
+        "adminId": { "type": "string" },
+        "chiefId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["requesterId", "startDate", "endDate", "leaveType", "reason", "status"]
+    },
+    "AttendanceRecord": {
+      "title": "Attendance Record",
+      "description": "Daily attendance record for an employee.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "userName": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "timeIn": { "type": "string", "format": "date-time" },
+        "timeOut": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "date"]
+    },
+    "ExchangeRequest": {
+      "title": "Exchange of Duty Request",
+      "description": "Request to exchange or swap duty shifts with another personnel.",
+      "type": "object",
+      "properties": {
+        "requesterId": { "type": "string" },
+        "requesterEmail": { "type": "string" },
+        "requesterName": { "type": "string" },
+        "requesterPhotoURL": { "type": "string" },
+        "exchangeWithId": { "type": "string" },
+        "exchangeWithName": { "type": "string" },
+        "originalDate": { "type": "string", "format": "date-time" },
+        "exchangeDate": { "type": "string", "format": "date-time" },
+        "reason": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "admin_approved", "approved", "rejected"] },
+        "adminId": { "type": "string" },
+        "chiefId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["requesterId", "originalDate", "exchangeDate", "reason", "status"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "User accounts."
+    },
+    "dtr_corrections/{requestId}": {
+      "schema": "DTRCorrection",
+      "description": "DTR correction requests."
+    },
+    "leave_applications/{applicationId}": {
+      "schema": "LeaveApplication",
+      "description": "Leave applications."
+    },
+    "attendance/{recordId}": {
+      "schema": "AttendanceRecord",
+      "description": "Attendance logs."
+    },
+    "exchange_requests/{requestId}": {
+      "schema": "ExchangeRequest",
+      "description": "Requests to exchange shifts."
+    }
+  }
+}

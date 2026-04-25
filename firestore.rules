@@ -1,0 +1,184 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return request.auth.token.email_verified == true;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function hasRole(role) {
+      let data = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return isSignedIn() && data != null && data.data.role == role;
+    }
+
+    function isSysAdmin() {
+      return request.auth.token.email == 'codh.pgp@gmail.com' || hasRole('sysadmin');
+    }
+
+    function isAdmin() {
+      return isSysAdmin() || hasRole('admin');
+    }
+
+    function isChief() {
+      return hasRole('chief');
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Users Collection
+    match /users/{userId} {
+      allow get: if isSignedIn() && (isOwner(userId) || isAdmin() || isChief());
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && (isSysAdmin() || isOwner(userId));
+      allow update: if isSignedIn() && (
+        isAdmin() ||
+        (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'department', 'phoneNumber', 'photoURL', 'profileCompleted', 'updatedAt']))
+      );
+      allow delete: if isSignedIn() && isSysAdmin();
+    }
+
+    // 3. DTR Corrections
+    match /dtr_corrections/{requestId} {
+      allow get: if isSignedIn() && (isOwner(existing().requesterId) || isAdmin() || isChief());
+      allow list: if isSignedIn() && (
+        isAdmin() || isChief() ||
+        (resource.data.requesterId == request.auth.uid)
+      );
+
+      function isValidDTR(data) {
+        return data.requesterId == request.auth.uid &&
+               data.status == 'pending' &&
+               data.reason is string && data.reason.size() <= 500 &&
+               data.correctionType in ['in', 'out', 'both'] &&
+               data.status in ['pending', 'admin_approved', 'approved', 'rejected'] &&
+               data.createdAt == request.time;
+      }
+
+      allow create: if isSignedIn() && isValidDTR(incoming()) && isValidId(requestId);
+
+      allow update: if isSignedIn() && (
+        // Admin approval
+        (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'adminId', 'updatedAt']) &&
+         incoming().status in ['admin_approved', 'rejected'] && incoming().updatedAt == request.time) ||
+        // Chief approval (Final)
+        (isChief() && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'chiefId', 'updatedAt']) &&
+         incoming().status in ['approved', 'rejected'] && incoming().updatedAt == request.time) ||
+        // User withdrawal/edit while pending
+        (isOwner(existing().requesterId) && existing().status == 'pending' &&
+         incoming().diff(existing()).affectedKeys().hasOnly(['reason', 'correctionType', 'requestedTime', 'updatedAt']) &&
+         incoming().updatedAt == request.time)
+      );
+    }
+
+    // 4. Leave Applications
+    match /leave_applications/{applicationId} {
+      allow get: if isSignedIn() && (isOwner(existing().requesterId) || isAdmin() || isChief());
+      allow list: if isSignedIn() && (
+        isAdmin() || isChief() ||
+        (resource.data.requesterId == request.auth.uid)
+      );
+
+      function isValidLeave(data) {
+        return data.requesterId == request.auth.uid &&
+               data.status == 'pending' &&
+               data.reason is string && data.reason.size() <= 1000 &&
+               data.status in ['pending', 'admin_approved', 'approved', 'rejected'] &&
+               data.createdAt == request.time;
+      }
+
+      allow create: if isSignedIn() && isValidLeave(incoming()) && isValidId(applicationId);
+
+      allow update: if isSignedIn() && (
+        // Admin approval
+        (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'adminId', 'updatedAt']) &&
+         incoming().status in ['admin_approved', 'rejected'] && incoming().updatedAt == request.time) ||
+        // Chief approval (Final)
+        (isChief() && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'chiefId', 'updatedAt']) &&
+         incoming().status in ['approved', 'rejected'] && incoming().updatedAt == request.time) ||
+        // User withdrawal
+        (isOwner(existing().requesterId) && existing().status == 'pending' &&
+         incoming().diff(existing()).affectedKeys().hasOnly(['reason', 'leaveType', 'startDate', 'endDate', 'updatedAt']) &&
+         incoming().updatedAt == request.time)
+      );
+    }
+
+    // 5. Attendance Records
+    match /attendance/{recordId} {
+      allow read: if isSignedIn() && (isOwner(resource.data.userId) || isAdmin() || isChief());
+      
+      function isValidAttendance(data) {
+        return data.userId == request.auth.uid &&
+               data.createdAt == request.time;
+      }
+
+      allow create: if isSignedIn() && isValidAttendance(incoming());
+      
+      allow update: if isSignedIn() && (
+        isAdmin() ||
+        (isOwner(existing().userId) && 
+         incoming().diff(existing()).affectedKeys().hasOnly(['timeOut', 'updatedAt']) &&
+         incoming().updatedAt == request.time)
+      );
+      allow delete: if false;
+    }
+
+    // 6. Exchange Requests
+    match /exchange_requests/{requestId} {
+      allow get: if isSignedIn() && (isOwner(existing().requesterId) || isAdmin() || isChief());
+      allow list: if isSignedIn() && (
+        isAdmin() || isChief() ||
+        (resource.data.requesterId == request.auth.uid)
+      );
+
+      function isValidExchange(data) {
+        return data.requesterId == request.auth.uid &&
+               data.status == 'pending' &&
+               data.reason is string && data.reason.size() <= 1000 &&
+               data.status in ['pending', 'admin_approved', 'approved', 'rejected'] &&
+               data.createdAt == request.time;
+      }
+
+      allow create: if isSignedIn() && isValidExchange(incoming()) && isValidId(requestId);
+
+      allow update: if isSignedIn() && (
+        // Admin approval
+        (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'adminId', 'updatedAt']) &&
+         incoming().status in ['admin_approved', 'rejected'] && incoming().updatedAt == request.time) ||
+        // Chief approval (Final)
+        (isChief() && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'chiefId', 'updatedAt']) &&
+         incoming().status in ['approved', 'rejected'] && incoming().updatedAt == request.time) ||
+        // User withdrawal
+        (isOwner(existing().requesterId) && existing().status == 'pending' &&
+         incoming().diff(existing()).affectedKeys().hasOnly(['reason', 'exchangeWithId', 'exchangeWithName', 'originalDate', 'exchangeDate', 'updatedAt']) &&
+         incoming().updatedAt == request.time)
+      );
+    }
+  }
+}

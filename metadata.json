@@ -1,0 +1,6 @@
+{
+  "name": "CoDH App",
+  "description": "A comprehensive system for managing employee attendance corrections, leave applications, and administrative reporting with multi-level approval workflows.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": []
+}
