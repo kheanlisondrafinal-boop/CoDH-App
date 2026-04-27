@@ -1,0 +1,15 @@
+[[redirects]]
+  from = "/"
+  to = "/CoDH-App/"
+  status = 301
+  force = false
+
+[[redirects]]
+  from = "/CoDH-App/assets/*"
+  to = "/assets/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/CoDH-App/*"
+  to = "/index.html"
+  status = 200
