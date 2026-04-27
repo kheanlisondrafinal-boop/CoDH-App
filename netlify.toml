@@ -2,7 +2,7 @@
   from = "/"
   to = "/CoDH-App/"
   status = 301
-  force = false
+  force = true
 
 [[redirects]]
   from = "/CoDH-App/assets/*"
